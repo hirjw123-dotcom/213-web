@@ -1,0 +1,23 @@
+{
+  "name": "213-v3",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node ./inline-assets.js && node ./copy-dist.js",
+    "update": "node ./update.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "diff-match-patch": "^1.0.5",
+    "glob": "^13.0.3",
+    "preact": "^10.28.2"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "terser": "^5.46.0",
+    "vite": "^7.2.4"
+  }
+}

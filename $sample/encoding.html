@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Encoder (57 Data + 3 Checksum A-J)</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f4f8;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            font-family: monospace;
+        }
+
+        .btn-group { margin-bottom: 10px; }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+
+        button:hover { background: #0056b3; }
+        button.print-btn { background: #28a745; }
+        button.print-btn:hover { background: #218838; }
+
+        /* 화면 표시용 결과창 */
+        #visualResult {
+            background-color: #fff;
+            height: 400px;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 10px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* 줄 단위 스타일 */
+        .line-row {
+            display: flex;
+            border-bottom: 1px solid #444;
+        }
+        .line-num {
+            width: 50px;
+            color: #888;
+            text-align: right;
+            padding-right: 15px;
+            border-right: 1px solid #555;
+            user-select: none; /* 드래그 방지 */
+            margin-right: 15px;
+        }
+        .line-data { color: #000; word-break: break-all; letter-spacing: 2px;font-weight:bold}
+        .line-sum { color: #ff0000; font-weight: bold; margin-left: 2px;}
+
+        /* 숨겨진 텍스트 area (복사용) */
+        #rawOutput {
+            height: 1px; 
+            opacity: 0; 
+            position: absolute; 
+            z-index: -1;
+        }
+
+        /* 인쇄 설정 */
+        @media print {
+            body { background: #fff; padding: 0; margin: 0; }
+            .container { max-width: 100%; margin: 0; }
+            h2, textarea, .btn-group, #stat { display: none; }
+            
+            #visualResult {
+                height: auto;
+                overflow: visible;
+                border: none;
+                margin: 0;
+                padding: 0;
+                /* 배경색 인쇄 강제 */
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .line-row {
+                page-break-inside: avoid; /* 중간에 잘림 방지 */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Source Enc (57 Data + 3 Sum[A-J])</h2>
+        <textarea id="src" placeholder="Source Code..."></textarea>
+        
+        <div class="btn-group">
+            <button onclick="gen()">Generate</button>
+            <button class="print-btn" onclick="window.print()">Print Result</button>
+            <button onclick="copyRaw()">Copy All Text</button>
+        </div>
+
+        <div id="stat"></div>
+        
+        <div id="visualResult">Ready...</div>
+        
+        <textarea id="rawOutput"></textarea>
+    </div>
+
+    <script>
+        const MAP = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+        async function gen() {
+            const src = document.getElementById('src').value;
+            if (!src) return;
+            try {
+                const stream = new ReadableStream({
+                    start(c) { c.enqueue(new TextEncoder().encode(src)); c.close(); }
+                }).pipeThrough(new CompressionStream('gzip'));
+                const buf = await new Response(stream).arrayBuffer();
+                const b32 = b32Enc(new Uint8Array(buf));
+                
+                // 데이터 처리 및 UI 그리기
+                renderResult(b32, src.length);
+                
+            } catch (e) { alert(e.message); }
+        }
+
+        function renderResult(fullStr, originalSize) {
+            let rawRes = '';
+            let html = '';
+            let lineIdx = 1;
+
+            for (let i = 0; i < fullStr.length; i += 57) {
+                const chunk = fullStr.substr(i, 57);
+                const sum = getSum(chunk);
+                
+                // Raw string for copy
+                rawRes += chunk + sum + '\n';
+
+                // HTML Construction
+                html += `<div class="line-row">
+                    <div class="line-num">${String(lineIdx++).padStart(2, '0')}</div>
+                    <div class="line-content">
+                        <span class="line-data">${chunk}</span><span class="line-sum">${sum}</span>
+                    </div>
+                </div>`;
+            }
+
+            document.getElementById('rawOutput').value = rawRes.replaceAll('\n', '').replaceAll(' ', '');
+            document.getElementById('visualResult').innerHTML = html;
+            document.getElementById('stat').innerText = `Original: ${originalSize}b / Encoded: ${rawRes.length}b / Lines: ${lineIdx-1}`;
+        }
+
+        function getSum(s) {
+            let t = 0;
+            for (let c of s) {
+                let k = c.charCodeAt(0);
+                if (k >= 48 && k <= 57) t += k - 48;       
+                else if (k >= 65 && k <= 90) t += k - 55;  
+                else if (k >= 97 && k <= 122) t += k - 87; 
+            }
+            const numStr = String(t % 1000).padStart(3, '0');
+            let mappedSum = '';
+            for (let char of numStr) {
+                mappedSum += String.fromCharCode(65 + parseInt(char)); 
+            }
+            return mappedSum;
+        }
+
+        function b32Enc(buf) {
+            let bits = 0, val = 0, out = '';
+            for (let i = 0; i < buf.length; i++) {
+                val = (val << 8) | buf[i];
+                bits += 8;
+                while (bits >= 5) { out += MAP[(val >>> (bits - 5)) & 31]; bits -= 5; }
+            }
+            if (bits > 0) out += MAP[(val << (5 - bits)) & 31];
+            return out;
+        }
+
+        function copyRaw() {
+            const el = document.getElementById('rawOutput');
+            el.select();
+            document.execCommand('copy');
+            alert('Copied to clipboard!');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Text Viewer</title>
+    <style>
+        /* 1. 모바일 기본 스타일 초기화 및 설정 */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            padding-bottom: 120px;
+            /* 하단 고정 영역에 가려지지 않도록 여백 확보 */
+            background-color: #f5f5f5;
+            font-family: 'Courier New', Courier, monospace;
+            /* 3. 글자 간격 동일하게 (고정폭 글꼴) */
+            font-size: 14px;
+            color: #333;
+        }
+
+        /* 메인 컨테이너 */
+        #content-container {
+            width: 100%;
+            overflow-x: hidden;
+            /* 가로 스크롤 방지 */
+        }
+
+        /* 2. 라인 스타일 */
+        .line-row {
+            display: flex;
+            width: 100%;
+            border-bottom: 1px solid #eee;
+            /* 줄 구분선 (선택사항) */
+            background-color: #fff;
+        }
+
+        /* 좌측 라인 번호 */
+        .line-num {
+            flex: 0 0 50px;
+            /* 고정 너비 50px */
+            background-color: #e0e0e0;
+            color: #666;
+            text-align: right;
+            padding-right: 8px;
+            padding-top: 4px;
+            /* 텍스트와 높이 맞춤 */
+            user-select: none;
+            /* 드래그 시 번호는 선택되지 않도록 설정 */
+            -webkit-user-select: none;
+            font-size: 12px;
+            border-right: 1px solid #ccc;
+        }
+
+        /* 실제 텍스트 영역 */
+        .line-text {
+	word-break: keep-all !important;
+overflow-wrap: normal;
+
+            flex: 1;
+            /* 남은 공간 모두 차지 */
+            padding: 4px 8px;
+            /* 단어 중간이라도 강제로 줄바꿈 (60자 유지를 위해) */
+            white-space: pre-wrap;
+            /* 공백 유지 */
+            line-height: 1.5;
+        }
+
+        /* 4. 하단 고정 Selection 영역 */
+        #selection-viewer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background-color: rgba(30, 30, 30, 0.95);
+            color: #fff;
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .selection-title {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        #selected-text-content {
+            flex: 1;
+            overflow-y: auto;
+            /* 내용이 많으면 스크롤 */
+            font-family: sans-serif;
+            /* 결과는 가독성 좋은 고딕 계열로 */
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="content-container">
+    </div>
+
+    <div id="selection-viewer">
+        <div class="selection-title">SELECTED TEXT</div>
+        <div id="selected-text-content">드래그하여 텍스트를 선택하세요.</div>
+    </div>
+
+    <script>
+        let originText = "";
+
+
+        const container = document.getElementById('content-container');
+        const selectionOutput = document.getElementById('selected-text-content');
+        const CHARS_PER_LINE = 60; // 2. 한 라인 60자
+
+
+        function renderText() {
+            // 성능 최적화를 위해 DocumentFragment 사용 (리플로우 최소화)
+            const fragment = document.createDocumentFragment();
+            const totalLength = originText.length;
+            let lineCount = 1;
+
+            for (let i = 0; i < totalLength; i += CHARS_PER_LINE) {
+
+                const lineContent = originText.substring(i, i + CHARS_PER_LINE);
+
+                // Row 생성
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'line-row';
+
+                // Line Number 생성
+                const numSpan = document.createElement('span');
+                numSpan.className = 'line-num';
+                numSpan.textContent = lineCount;
+
+                // Text Content 생성
+                const textSpan = document.createElement('span');
+                textSpan.className = 'line-text';
+                textSpan.textContent = lineContent.replace(/.{5}/g, a=>a+' ');
+
+                // 조립
+                rowDiv.appendChild(numSpan);
+                rowDiv.appendChild(textSpan);
+                fragment.appendChild(rowDiv);
+
+                lineCount++;
+            }
+
+            // DOM에 한 번에 추가
+            container.appendChild(fragment);
+        }
+
+        /**
+         * 선택된 텍스트를 실시간으로 감지하는 함수
+         */
+        function handleSelection() {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().replaceAll(' ','');
+
+            if (selectedText.length > 0) {
+                // 개행 문자 등이 포함될 수 있으므로 trim 처리 혹은 그대로 표시
+                selectionOutput.textContent = getSum(selectedText);
+            } else {
+                selectionOutput.textContent = "드래그하여 텍스트를 선택하세요.";
+            }
+        }
+
+        function getSum(s) {
+            let t = 0;
+            for (let c of s) {
+                let k = c.charCodeAt(0);
+                if (k >= 48 && k <= 57) t += k - 48;
+                else if (k >= 65 && k <= 90) t += k - 55;
+                else if (k >= 97 && k <= 122) t += k - 87;
+            }
+            const numStr = String(t % 1000).padStart(3, '0');
+            let mappedSum = '';
+            for (let char of numStr) {
+                mappedSum += String.fromCharCode(65 + parseInt(char));
+            }
+            return mappedSum;
+        }
+
+        // 초기화 실행
+        renderText();
+
+        // 4. 이벤트 리스너 등록 (PC 및 모바일 대응)
+        // 'selectionchange'는 document 레벨에서 가장 잘 동작합니다.
+        document.addEventListener('selectionchange', handleSelection);
+
+    </script>
+</body>
+
+</html>

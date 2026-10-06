@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>파일 비교 (커스텀 포맷)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #f9f9f9; }
+        button { background: #2e3b2f; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; font-size: 16px; }
+        #status { margin-top: 15px; color: blue; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>1. 커스텀 업데이트 추출기</h2>
+    <p style="font-size:13px; color:#666;">※ URL 인코딩 없이 순수 텍스트 구분자로 압축합니다.</p>
+    <p><b>Before (원본):</b> <input type="file" id="beforeFile"></p>
+    <p><b>After (수정):</b> <input type="file" id="afterFile"></p>
+    <button onclick="generatePatch()">updates.txt 생성하기</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    async function readFileAsText(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsText(file);
+        });
+    }
+
+
+    function generateJSONPatch(patches) {
+        // 객체의 키(key)값도 생략하고 순수 데이터만 배열로 압축
+        const compactPatches = patches.map(p => [
+            p.start1, p.length1, p.start2, p.length2,
+            p.diffs
+        ]);
+        // 들여쓰기 없이 한 줄짜리 JSON 문자열로 변환 (용량 최소화)
+        return JSON.stringify(compactPatches);
+    }
+
+    async function generatePatch() {
+        const beforeFile = document.getElementById('beforeFile').files[0];
+        const afterFile = document.getElementById('afterFile').files[0];
+        const statusDiv = document.getElementById('status');
+
+        if (!beforeFile || !afterFile) return alert('파일 두 개를 모두 올려주세요.');
+        statusDiv.innerText = "비교 중입니다...";
+
+        try {
+            let textBefore = (await readFileAsText(beforeFile)).replace(/\r\n/g, '\n');
+            let textAfter = (await readFileAsText(afterFile)).replace(/\r\n/g, '\n');
+
+            const dmp = new diff_match_patch();
+            dmp.Patch_Margin = 2; 
+
+            const a = dmp.diff_linesToChars_(textBefore, textAfter);
+            const diffs = dmp.diff_main(a.chars1, a.chars2, false);
+            dmp.diff_charsToLines_(diffs, a.lineArray);
+            dmp.diff_cleanupSemantic(diffs);
+
+            const patches = dmp.patch_make(textBefore, diffs);
+            
+            // 변경점: JSON 패치 생성 함수 호출
+            const patchText = generateJSONPatch(patches);
+
+            // 빈 배열 "[]" 이 반환되면 변경점이 없는 것
+            if (patchText === "[]") {
+                statusDiv.innerText = "내용이 완전히 같습니다!";
+                return;
+            }
+
+            const kbSize = (new Blob([patchText]).size / 1024).toFixed(2);
+            const blob = new Blob([patchText], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'updates.json'; // 확장자도 json이나 txt로 자유롭게 사용 가능
+            link.click();
+            
+            statusDiv.innerText = `✅ 완료! 매우 가벼운 업데이트 파일 생성됨 (용량: ${kbSize} KB)`;
+        } catch (e) {
+            statusDiv.innerText = "오류: " + e.message;
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR 최적화 출력 도구 (다중 페이지 지원)</title>
+    <style>
+        /* --- 1. 화면(Screen) 스타일 --- */
+        body {
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+
+        }
+
+        .control-panel {
+            width: 210mm;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        /* 미리보기 화면에서의 종이 모양 */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 0mm;
+            /* 화면에서 볼 때의 여백 */
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+
+            /* OCR 폰트 설정 */
+            font-size: 11pt;
+            /* 글자 크기 */
+            line-height: 2;
+            /* 줄 간격 (충분히 넓게) */
+            letter-spacing: 0.2em;
+            /* 자간 (글자끼리 붙지 않게) */
+            color: black;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            /* 줄바꿈과 띄어쓰기 그대로 유지 */
+        }
+
+        /* --- 2. 인쇄(Print) 스타일 (핵심 수정 부분) --- */
+        @media print {
+
+            /* 종이 자체의 여백 설정: 모든 페이지에 적용됨 */
+            @page {
+                size: A4;
+                margin: 20mm;
+                /* 상하좌우 20mm 강제 여백 */
+            }
+
+            body {
+                background: none;
+                margin: 0;
+                padding: 0;
+            }
+
+            .control-panel {
+                display: none !important;
+            }
+
+            .page {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                /* @page에서 여백을 줬으므로 여기선 0으로 설정 */
+                border: none;
+                box-shadow: none;
+
+                /* 페이지 넘김 설정 */
+                page-break-inside: auto;
+                font-family: 'Consolas', 'Courier New', monospace;
+            }
+
+            /* 문단이 페이지 끝에 걸칠 때 쪼개지지 않도록 방지 (선택 사항) */
+            p,
+            div {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="control-panel">
+        <h2>OCR 최적화 텍스트 생성기 (다중 페이지)</h2>
+        <p class="info">
+            긴 텍스트를 붙여넣으세요. 인쇄 시 <b>모든 페이지에 20mm 여백</b>이 자동으로 적용됩니다.<br>
+            * 미리보기 화면에서는 한 장처럼 보이지만, 인쇄 버튼을 누르면 자동으로 페이지가 나뉩니다.
+        </p>
+        <textarea class="" id="inputText" placeholder="여기에 긴 텍스트를 입력하세요..."></textarea>
+        <button onclick="window.print()">🖨️ 인쇄하기 (Print)</button>
+    </div>
+
+    <div class="page " id="outputArea"></div>
+
+    <script>
+        const textarea = document.getElementById('inputText');
+        const output = document.getElementById('outputArea');
+
+        textarea.addEventListener('input', function () {
+            output.textContent = this.value;
+        });
+
+        // 초기 예시 텍스트
+        output.textContent = "여기에 내용을 입력하면 미리보기가 표시됩니다.\n\n긴 내용을 입력해서 인쇄 버튼을 눌러보세요.\n모든 페이지의 테두리에 균일한 여백이 생깁니다.";
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,78 @@
+
+const PROXY = "http://localhost:6324/";
+
+async function proxyFetch(url, options = {}) {
+    const res = await fetch(PROXY, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            url,
+            method: options.method || "GET",
+            headers: options.headers || undefined,
+            body: options.body || undefined,
+            cookies: options.cookies || undefined,
+        }),
+    });
+    return res.json();
+}
+
+
+// ─── 예시 1: GET 요청 ──────────────────────────
+
+async function exampleGet() {
+    const result = await proxyFetch("https://jsonplaceholder.typicode.com/posts/1");
+    console.log("GET status:", result.status);
+    console.log("GET body:", result.body);
+    console.log("GET cookies:", result.cookies);
+}
+
+exampleGet();
+
+
+// ─── 예시 2: POST 요청 ─────────────────────────
+
+async function examplePost() {
+    const result = await proxyFetch("https://jsonplaceholder.typicode.com/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "foo", body: "bar", userId: 1 }),
+    });
+    console.log("POST status:", result.status);
+    console.log("POST body:", result.body);
+}
+
+examplePost();
+
+
+// ─── 예시 3: 쿠키 포함 요청 ─────────────────────
+
+async function exampleWithCookies() {
+    const result = await proxyFetch("https://httpbin.org/cookies", {
+        method: "GET",
+        cookies: "session_id=abc123; token=xyz789",
+    });
+    console.log("Cookie example:", result.body);
+}
+
+exampleWithCookies();
+
+
+// ─── 예시 4: 이전 응답 쿠키를 재사용 ─────────────
+
+async function exampleCookieReuse() {
+    // 1) 로그인 등으로 쿠키 받기
+    const loginResult = await proxyFetch("https://httpbin.org/cookies/set?name=value", {
+        method: "GET",
+    });
+    const receivedCookies = loginResult.cookies; // "name=value"
+    console.log("Received cookies:", receivedCookies);
+
+    // 2) 받은 쿠키로 다음 요청
+    const nextResult = await proxyFetch("https://httpbin.org/cookies", {
+        method: "GET",
+        cookies: receivedCookies,
+    });
+    console.log("With cookies:", nextResult.body);
+}
+
+exampleCookieReuse();
